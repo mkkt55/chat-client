@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/binary"
 	"fmt"
 	"net"
 	"time"
@@ -9,6 +10,12 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
+
+type Header struct {
+	flag    int32
+	protoId int32
+	bodyLen int32
+}
 
 var conn net.Conn
 var reader *bufio.Reader
@@ -35,32 +42,53 @@ func ReleaseConnection() bool {
 	return true
 }
 
-func SendProto(m protoreflect.ProtoMessage) bool {
+func SendProto(m protoreflect.ProtoMessage, id ProtoId) bool {
 	result, err := proto.Marshal(m)
+	fmt.Print(result)
 	if err != nil {
 		fmt.Printf("Proto marshal error... %s\n", err.Error())
 		return false
 	}
+	var bytes []byte = make([]byte, 4)
+	binary.BigEndian.PutUint32(bytes, 100)
+	nn, err := writer.Write(bytes)
+	fmt.Print("nn", nn)
+	binary.BigEndian.PutUint32(bytes, uint32(id))
+	nn, err = writer.Write(bytes)
+	fmt.Print("nn", nn)
+	binary.BigEndian.PutUint32(bytes, uint32(len(result)))
+	nn, err = writer.Write(bytes)
+	fmt.Print("nn", nn)
 	// var head []byte = make([]byte, 0)
 	// head = append(head, len(result))
 	// _, err = writer.Write(head)
 	if err != nil {
+		fmt.Printf("Write header error... %s\n", err.Error())
+		return false
+	}
+	nn, err = writer.Write(result)
+	fmt.Print("nn", nn)
+	if err != nil {
 		fmt.Printf("Write error... %s\n", err.Error())
 		return false
 	}
-	_, err = writer.Write(result)
+	err = writer.Flush()
 	if err != nil {
-		fmt.Printf("Write error... %s\n", err.Error())
+		fmt.Printf("Flush error... %s\n", err.Error())
 		return false
 	}
 	return true
 }
 
 func TestSend() bool {
-	time.Sleep(time.Second * 5)
+	time.Sleep(time.Second * 3)
 	var pack LoginReq
-	fmt.Print(pack.GetId(), "\n")
-	return SendProto(&pack)
+	str := "???"
+	pack.Auth = &str
+	SendProto(&pack, pack.GetId())
+
+	time.Sleep(time.Second * 3)
+	return true
 }
 
 func Read(buffer []byte) bool {
