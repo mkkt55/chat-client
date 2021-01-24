@@ -52,13 +52,16 @@ func SendProto(m protoreflect.ProtoMessage, id ProtoId) bool {
 	var bytes []byte = make([]byte, 4)
 	binary.BigEndian.PutUint32(bytes, 100)
 	nn, err := writer.Write(bytes)
-	fmt.Print("nn", nn)
+	err = writer.Flush()
+	time.Sleep(time.Second * 3)
 	binary.BigEndian.PutUint32(bytes, uint32(id))
 	nn, err = writer.Write(bytes)
-	fmt.Print("nn", nn)
+	err = writer.Flush()
+	time.Sleep(time.Second * 3)
 	binary.BigEndian.PutUint32(bytes, uint32(len(result)))
 	nn, err = writer.Write(bytes)
-	fmt.Print("nn", nn)
+	err = writer.Flush()
+	time.Sleep(time.Second * 3)
 	// var head []byte = make([]byte, 0)
 	// head = append(head, len(result))
 	// _, err = writer.Write(head)
@@ -83,7 +86,10 @@ func SendProto(m protoreflect.ProtoMessage, id ProtoId) bool {
 func TestSend() bool {
 	time.Sleep(time.Second * 3)
 	var pack LoginReq
-	str := "???"
+	str := "111"
+	pack.Auth = &str
+	SendProto(&pack, pack.GetId())
+	str = "222"
 	pack.Auth = &str
 	SendProto(&pack, pack.GetId())
 
