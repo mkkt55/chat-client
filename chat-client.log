@@ -1,0 +1,13 @@
+??? 2021/01/27 18:43:33 C:/Users/xy/Desktop/chat-client/net_mgr.go:82: In ReadProto
+??? 2021/01/27 18:43:33 C:/Users/xy/Desktop/chat-client/net_mgr.go:107: bytes:  [0 0 0 0 1 0 0 0 5]
+??? 2021/01/27 18:43:34 C:/Users/xy/Desktop/chat-client/net_mgr.go:89: 收到bytes:  [12 0 0 0 2 0 0 0 6]
+??? 2021/01/27 18:43:34 C:/Users/xy/Desktop/chat-client/net_mgr.go:98: 收到Pack:  {12 2 6 [16 0 26 2 72 105]}
+??? 2021/01/27 18:43:34 C:/Users/xy/Desktop/chat-client/console_client.go:81: Receive proto, id:  2
+??? 2021/01/27 18:43:34 C:/Users/xy/Desktop/chat-client/net_mgr.go:82: In ReadProto
+??? 2021/01/27 18:43:34 C:/Users/xy/Desktop/chat-client/console_client.go:55: err:  err_none
+??? 2021/01/27 18:43:34 C:/Users/xy/Desktop/chat-client/console_client.go:56: auth:  Hi
+??? 2021/01/27 18:43:35 C:/Users/xy/Desktop/chat-client/console_client.go:67: Read cmd from console: ls
+??? 2021/01/27 18:43:38 C:/Users/xy/Desktop/chat-client/console_client.go:67: Read cmd from console: cd
+??? 2021/01/27 18:43:42 C:/Users/xy/Desktop/chat-client/console_client.go:67: Read cmd from console: c
+??? 2021/01/27 18:43:43 C:/Users/xy/Desktop/chat-client/console_client.go:67: Read cmd from console: cd
+??? 2021/01/27 18:43:44 C:/Users/xy/Desktop/chat-client/console_client.go:67: Read cmd from console: ls

@@ -1,13 +1,9 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
+	"log"
 	"os"
-	"strings"
-	"time"
-
-	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -17,106 +13,131 @@ const (
 	InRoom   = 4
 )
 
-var page = 0
-var path = ""
-var status = UnAuth
+var fileName = "chat-client.log"
+var logFile *os.File
+var logger *log.Logger
+var clientPath = ""
+var clientStatus = UnAuth
 
-func Run() {
-	reader := bufio.NewReader(os.Stdin)
-	fmt.Println("Simple Shell")
-	fmt.Println("---------------------")
-	for {
-		//
-		fmt.Printf("%s >", getPageName())
-		cmd, _ := reader.ReadString('\n')
-		handleCmd(cmd)
+func Init() bool {
+	var err error
+	logFile, err = os.Create(fileName)
+	if err != nil {
+		log.Fatal("获取日志文件失败")
 	}
-
+	logger = log.New(logFile, "??? ", log.Ldate|log.Ltime|log.Llongfile)
+	if logger == nil {
+		log.Fatal("日志记录功能初始化失败")
+	}
+	if !InitConnection() {
+		fmt.Println("连接服务器失败...")
+		return false
+	}
+	go dealFromNet()
+	if !auth() {
+		fmt.Println("验证身份失败...")
+		ReleaseConnection()
+		return false
+	}
+	return true
 }
 
-func Auth() bool {
-	time.Sleep(time.Second * 3)
+func auth() bool {
 	var pack LoginReq
 	str := "111"
 	pack.Auth = &str
 	SendProto(&pack, pack.GetId())
 
-	pProto, err := ReadProto()
-	if err != nil {
+	ack, ok := <-LoginChan
+	if !ok {
 		return false
 	}
-	fmt.Println(pProto.protoId)
-	var ack LoginResp
-	err = proto.Unmarshal(pProto.body, &ack)
-	if err != nil {
-		fmt.Println("Unmarshal proto fail...")
-		return false
-	}
-	fmt.Println("err: ", ack.GetError())
-	fmt.Println("auth: ", ack.GetAuth())
+	logger.Println("err: ", ack.GetError())
+	logger.Println("auth: ", ack.GetAuth())
 	return true
 }
 
-func getPageName() string {
-	switch page {
-	case 0:
-		return "会话"
-	case 1:
-		return "联系人"
-	case 2:
-		return "设置"
+func Run() {
+	fmt.Println("Simple Shell")
+	fmt.Println("---------------------")
+	for {
+		fmt.Print(clientPath, " > ")
+		var cmd, param1, param2, param3, param4 string
+		_, _ = fmt.Scanln(&cmd, &param1, &param2, &param3, &param4)
+		logger.Print("Read cmd from console: ", cmd)
+		if len(cmd) == 0 {
+			continue
+		}
+		handleCmd(cmd, param1, param2, param3, param4)
 	}
-	return "?"
 }
 
-func getPath() string {
-	return getPageName() + path
+func dealFromNet() {
+	for {
+		pProto, err := ReadProto()
+		if err != nil {
+			continue
+		}
+		logger.Println("Receive proto, id: ", pProto.protoId)
+		switch pProto.protoId {
+		case uint32(ProtoId_login_resp_id):
+			HandleLoginResp(pProto)
+			break
+		case uint32(ProtoId_create_room_resp_id):
+			HandleCreateRoomResp(pProto)
+			break
+		case uint32(ProtoId_dismiss_room_resp_id):
+			HandleDismissRoomResp(pProto)
+			break
+		case uint32(ProtoId_change_room_settings_resp_id):
+			HandleChangeRoomSettingsResp(pProto)
+			break
+		case uint32(ProtoId_change_room_settings_ntf_id):
+			HandleChangeRoomSettingsNtf(pProto)
+			break
+		case uint32(ProtoId_join_room_resp_id):
+			HandleJoinRoomResp(pProto)
+			break
+		case uint32(ProtoId_change_join_settings_resp_id):
+			HandleChangeJoinSettingsResp(pProto)
+			break
+		case uint32(ProtoId_send_info_resp_id):
+			HandleSendInfoResp(pProto)
+			break
+		case uint32(ProtoId_exit_room_resp_id):
+			HandleExitRoomResp(pProto)
+			break
+		default:
+			logger.Println("未知网络消息：", pProto.protoId)
+		}
+	}
 }
 
-func handleCmd(cmd string) {
-	var arr = strings.Split(cmd, " ")
-	if len(arr) == 0 {
-		fmt.Print(cmd)
-		return
-	}
-	switch arr[0] {
+func handleCmd(cmd string, param1 string, param2 string, param3 string, param4 string) {
+	switch cmd {
 	case "cd":
-		cd(arr)
+		cd(param1)
 		break
 	case "ls":
-		ls(arr)
-		break
-	case "findu":
-		findu(arr)
-		break
-	case "findg":
-		findg(arr)
-		break
-	case "addu":
-		findg(arr)
-		break
-	case "addg":
-		findg(arr)
+		ls()
 		break
 	default:
-		fmt.Printf("未知命令：%s", arr[0])
+		fmt.Printf("未知命令：\"%s\"\n", cmd)
 	}
 }
 
-func cd(cmdArr []string) {
-	if len(cmdArr) < 2 {
-		fmt.Print(`
-		usage: cd [target_num]
-		`)
+func cd(path string) {
+	if len(path) == 0 || path == ".." {
+		clientPath = ""
+		fmt.Println("退出房间")
+	} else {
+		clientPath = path
+		fmt.Println("进入房间", path)
 	}
 }
 
-func ls(cmdArr []string) {
-	if len(cmdArr) < 1 {
-		fmt.Print(`
-		usage: ls [target_num]
-		`)
-	}
+func ls() {
+	fmt.Printf("In ls cmd\n")
 }
 
 func findu(cmdArr []string) {

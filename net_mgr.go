@@ -79,20 +79,23 @@ func SendProto(m protoreflect.ProtoMessage, id ProtoId) error {
 }
 
 func ReadProto() (*ProtoPack, error) {
-	fmt.Println("In ReadProto")
+	logger.Println("In ReadProto")
 	var pack ProtoPack
 	bytes := make([]byte, headerLen)
 	_, err := io.ReadFull(reader, bytes)
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println(bytes)
+	logger.Println("收到bytes: ", bytes)
 	pack.flag = bytes[0]
 	pack.protoId = binary.BigEndian.Uint32(bytes[1:5])
 	pack.bodyLen = binary.BigEndian.Uint32(bytes[5:9])
 	pack.body = make([]byte, pack.bodyLen)
-	io.ReadFull(reader, pack.body)
-	fmt.Println(pack)
+	_, err = io.ReadFull(reader, pack.body)
+	if err != nil {
+		return nil, err
+	}
+	logger.Println("收到Pack: ", pack)
 	return &pack, nil
 }
 
@@ -101,6 +104,6 @@ func buildHeader(flag byte, id ProtoId, bodyLen int) ([]byte, error) {
 	bytes[0] = flag
 	binary.BigEndian.PutUint32(bytes[1:], uint32(id))
 	binary.BigEndian.PutUint32(bytes[5:], uint32(bodyLen))
-	fmt.Println("bytes: ", bytes)
+	logger.Println("bytes: ", bytes)
 	return bytes, nil
 }

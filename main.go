@@ -1,7 +1,8 @@
 package main
 
 func main() {
-	InitConnection()
-	Auth()
-	ReleaseConnection()
+	if !Init() {
+		return
+	}
+	Run()
 }
