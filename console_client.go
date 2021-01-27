@@ -44,8 +44,24 @@ func Init() bool {
 
 func auth() bool {
 	var pack LoginReq
-	str := "111"
-	pack.Auth = &str
+	_, err := os.Stat("./auth")
+	var authFile *os.File
+	authStr := ""
+	if err == nil {
+		authFile, err = os.Open("./auth")
+	} else if err != nil && os.IsNotExist(err) {
+		authFile, err = os.Create("./auth")
+	}
+	if err == nil {
+		bytes := make([]byte, 100)
+		n, err := authFile.Read(bytes)
+		fmt.Println(bytes[:n])
+		if err == nil {
+			authStr = string(bytes[:n])
+		}
+	}
+	pack.Auth = &authStr
+	fmt.Println(authStr)
 	SendProto(&pack, pack.GetId())
 
 	ack, ok := <-LoginChan
