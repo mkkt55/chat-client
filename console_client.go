@@ -49,27 +49,36 @@ func auth() bool {
 	authStr := ""
 	if err == nil {
 		authFile, err = os.Open("./auth")
-	} else if err != nil && os.IsNotExist(err) {
-		authFile, err = os.Create("./auth")
-	}
-	if err == nil {
-		bytes := make([]byte, 100)
-		n, err := authFile.Read(bytes)
-		fmt.Println(bytes[:n])
 		if err == nil {
-			authStr = string(bytes[:n])
+			bytes := make([]byte, 100)
+			n, err := authFile.Read(bytes)
+			fmt.Println(bytes[:n])
+			if err == nil {
+				authStr = string(bytes[:n])
+			}
 		}
 	}
+
 	pack.Auth = &authStr
 	fmt.Println(authStr)
 	SendProto(&pack, pack.GetId())
 
 	ack, ok := <-LoginChan
 	if !ok {
+		if authFile != nil {
+			authFile.Close()
+		}
 		return false
 	}
 	logger.Println("err: ", ack.GetError())
 	logger.Println("auth: ", ack.GetAuth())
+	if len(ack.GetAuth()) != 0 {
+		authFile, err = os.Create("./auth")
+		authFile.Write([]byte(ack.GetAuth()))
+	}
+	if authFile != nil {
+		authFile.Close()
+	}
 	return true
 }
 
