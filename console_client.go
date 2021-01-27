@@ -5,11 +5,19 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
+)
+
+const (
+	UnAuth   = 1
+	WaitAuth = 2
+	OutRoom  = 3
+	InRoom   = 4
 )
 
 var page = 0
 var path = ""
-var position = 0
+var status = UnAuth
 
 func Run() {
 	reader := bufio.NewReader(os.Stdin)
@@ -21,6 +29,21 @@ func Run() {
 		cmd, _ := reader.ReadString('\n')
 		handleCmd(cmd)
 	}
+
+}
+
+func Auth() bool {
+	time.Sleep(time.Second * 3)
+	var pack LoginReq
+	str := "111"
+	pack.Auth = &str
+	SendProto(&pack, pack.GetId())
+	str = "222"
+	pack.Auth = &str
+	SendProto(&pack, pack.GetId())
+
+	time.Sleep(time.Second * 3)
+	return true
 }
 
 func getPageName() string {

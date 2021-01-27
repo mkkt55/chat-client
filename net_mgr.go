@@ -4,18 +4,23 @@ import (
 	"bufio"
 	"encoding/binary"
 	"fmt"
+	"io"
 	"net"
-	"time"
 
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
-type Header struct {
-	flag    int32
-	protoId int32
-	bodyLen int32
+type ProtoPack struct {
+	flag    byte
+	protoId uint32
+	bodyLen uint32
+	body    []byte
 }
+
+const (
+	headerLen = 9
+)
 
 var conn net.Conn
 var reader *bufio.Reader
@@ -42,66 +47,58 @@ func ReleaseConnection() bool {
 	return true
 }
 
-func SendProto(m protoreflect.ProtoMessage, id ProtoId) bool {
+func SendProto(m protoreflect.ProtoMessage, id ProtoId) error {
 	result, err := proto.Marshal(m)
-	fmt.Print(result)
 	if err != nil {
 		fmt.Printf("Proto marshal error... %s\n", err.Error())
-		return false
+		return err
 	}
-	var bytes []byte = make([]byte, 4)
-	binary.BigEndian.PutUint32(bytes, 100)
-	nn, err := writer.Write(bytes)
-	err = writer.Flush()
-	time.Sleep(time.Second * 3)
-	binary.BigEndian.PutUint32(bytes, uint32(id))
-	nn, err = writer.Write(bytes)
-	err = writer.Flush()
-	time.Sleep(time.Second * 3)
-	binary.BigEndian.PutUint32(bytes, uint32(len(result)))
-	nn, err = writer.Write(bytes)
-	err = writer.Flush()
-	time.Sleep(time.Second * 3)
-	// var head []byte = make([]byte, 0)
-	// head = append(head, len(result))
-	// _, err = writer.Write(head)
+	var flag byte
+	header, err := buildHeader(flag, id, len(result))
+	if err != nil {
+		fmt.Printf("Build header error... %s\n", err.Error())
+		return err
+	}
+
+	_, err = writer.Write(header)
 	if err != nil {
 		fmt.Printf("Write header error... %s\n", err.Error())
-		return false
+		return err
 	}
-	nn, err = writer.Write(result)
-	fmt.Print("nn", nn)
+	_, err = writer.Write(result)
 	if err != nil {
-		fmt.Printf("Write error... %s\n", err.Error())
-		return false
+		fmt.Printf("Write body error... %s\n", err.Error())
+		return err
 	}
 	err = writer.Flush()
 	if err != nil {
 		fmt.Printf("Flush error... %s\n", err.Error())
-		return false
+		return err
 	}
-	return true
+	return nil
 }
 
-func TestSend() bool {
-	time.Sleep(time.Second * 3)
-	var pack LoginReq
-	str := "111"
-	pack.Auth = &str
-	SendProto(&pack, pack.GetId())
-	str = "222"
-	pack.Auth = &str
-	SendProto(&pack, pack.GetId())
-
-	time.Sleep(time.Second * 3)
-	return true
-}
-
-func Read(buffer []byte) bool {
-	_, err := reader.Read(buffer)
+func ReadProto() (*ProtoPack, error) {
+	var pack ProtoPack
+	bytes := make([]byte, headerLen)
+	_, err := io.ReadFull(reader, bytes)
 	if err != nil {
-		fmt.Printf("Read error... %s\n", err.Error())
-		return false
+		return nil, err
 	}
-	return true
+	fmt.Println(bytes)
+	pack.flag = bytes[0]
+	pack.protoId = binary.BigEndian.Uint32(bytes[1:5])
+	pack.bodyLen = binary.BigEndian.Uint32(bytes[5:9])
+	pack.body = make([]byte, pack.bodyLen)
+	fmt.Println(pack)
+	io.ReadFull(reader, pack.body)
+	return &pack, nil
+}
+
+func buildHeader(flag byte, id ProtoId, bodyLen int) ([]byte, error) {
+	var bytes []byte = make([]byte, 0)
+	bytes = append(bytes, flag)
+	binary.BigEndian.PutUint32(bytes, uint32(id))
+	binary.BigEndian.PutUint32(bytes, uint32(bodyLen))
+	return bytes, nil
 }
