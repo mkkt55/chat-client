@@ -6,6 +6,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -38,11 +40,20 @@ func Auth() bool {
 	str := "111"
 	pack.Auth = &str
 	SendProto(&pack, pack.GetId())
-	str = "222"
-	pack.Auth = &str
-	SendProto(&pack, pack.GetId())
 
-	time.Sleep(time.Second * 3)
+	pProto, err := ReadProto()
+	if err != nil {
+		return false
+	}
+	fmt.Println(pProto.protoId)
+	var ack LoginResp
+	err = proto.Unmarshal(pProto.body, &ack)
+	if err != nil {
+		fmt.Println("Unmarshal proto fail...")
+		return false
+	}
+	fmt.Println("err: ", ack.GetError())
+	fmt.Println("auth: ", ack.GetAuth())
 	return true
 }
 
