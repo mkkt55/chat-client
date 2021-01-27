@@ -72,6 +72,7 @@ func auth() bool {
 	}
 	logger.Println("err: ", ack.GetError())
 	logger.Println("auth: ", ack.GetAuth())
+	fmt.Println(ack.GetAuth())
 	if len(ack.GetAuth()) != 0 {
 		authFile, err = os.Create("./auth")
 		authFile.Write([]byte(ack.GetAuth()))
