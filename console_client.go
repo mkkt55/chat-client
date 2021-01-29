@@ -1,12 +1,10 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"log"
 	"os"
 	"strconv"
-	"strings"
 )
 
 const (
@@ -94,21 +92,8 @@ func auth() bool {
 func Run() {
 	fmt.Println("Simple Shell")
 	fmt.Println("---------------------")
-	scanner := bufio.NewScanner(os.Stdin)
 	for {
 		fmt.Print(curRoomId, " > ")
-		scanner.Scan()
-		text := scanner.Text()
-		text = strings.TrimRight(text, "\n")
-		strArrWithEmpty := strings.Split(text, " ")
-		strArr := make([]string, 0)
-		for i := 0; i < len(strArrWithEmpty); i++ {
-			if len(strArrWithEmpty[i]) == 0 {
-				continue
-			}
-			strArr = append(strArr, strArrWithEmpty[i])
-		}
-		print(len(strArr))
 		var cmd, param1, param2, param3, param4 string
 		_, _ = fmt.Scanln(&cmd, &param1, &param2, &param3, &param4)
 		logger.Print("Read cmd from console: ", cmd)
@@ -226,7 +211,9 @@ func cd(targetRoomId int32) {
 		fmt.Print("请输入您加入的昵称：")
 		var joinName string
 		fmt.Scanln(&joinName)
-		req.Settings.JoinName = &joinName
+		var settings JoinSettings
+		settings.JoinName = &joinName
+		req.Settings = &settings
 		SendProto(&req, req.GetId())
 		ack, ok := <-JoinRoomChan
 		if !ok {
@@ -251,7 +238,9 @@ func ls() {
 func mkroom(name string, open string) {
 	fmt.Println(name)
 	var req CreateRoomReq
-	req.Settings.RoomName = &name
+	var rs RoomSettings
+	rs.RoomName = &name
+	req.Settings = &rs
 	if len(name) == 0 {
 		fmt.Print("请输入您想要设置的房间名：")
 		fmt.Scanln(&name)
