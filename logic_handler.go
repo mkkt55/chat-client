@@ -5,32 +5,82 @@ import (
 )
 
 var LoginChan = make(chan LoginResp, 1)
+var GetAllRoomListChan = make(chan GetAllRoomListResp, 1)
+var CreateRoomChan = make(chan CreateRoomResp, 1)
+var DismissRoomChan = make(chan DismissRoomResp, 1)
+var JoinRoomChan = make(chan JoinRoomResp, 1)
+var ExitRoomChan = make(chan ExitRoomResp, 1)
 
 func HandleLoginResp(pProto *ProtoPack) bool {
 	var ack LoginResp
 	err := proto.Unmarshal(pProto.body, &ack)
 	if err != nil {
-		logger.Println("Unmarshal proto fail...")
+		logger.Println("Unmarshal proto fail...", ack.GetId())
 		return false
 	}
 	LoginChan <- ack
 	return true
 }
 
-func HandleCreateRoomResp(pProto *ProtoPack) bool {
+func HandleGetAllRoomListResp(pProto *ProtoPack) bool {
+	var ack GetAllRoomListResp
+	err := proto.Unmarshal(pProto.body, &ack)
+	if err != nil {
+		logger.Println("Unmarshal proto fail...", ack.GetId())
+		return false
+	}
+	GetAllRoomListChan <- ack
 	return true
 }
 
-func HandleDismissRoomResp(pProto *ProtoPack) bool { return true }
+func HandleCreateRoomResp(pProto *ProtoPack) bool {
+	var ack CreateRoomResp
+	err := proto.Unmarshal(pProto.body, &ack)
+	if err != nil {
+		logger.Println("Unmarshal proto fail...", ack.GetId())
+		return false
+	}
+	CreateRoomChan <- ack
+	return true
+}
+
+func HandleDismissRoomResp(pProto *ProtoPack) bool {
+	var ack DismissRoomResp
+	err := proto.Unmarshal(pProto.body, &ack)
+	if err != nil {
+		logger.Println("Unmarshal proto fail...", ack.GetId())
+		return false
+	}
+	DismissRoomChan <- ack
+	return true
+}
 
 func HandleChangeRoomSettingsResp(pProto *ProtoPack) bool { return true }
 
 func HandleChangeRoomSettingsNtf(pProto *ProtoPack) bool { return true }
 
-func HandleJoinRoomResp(pProto *ProtoPack) bool { return true }
+func HandleJoinRoomResp(pProto *ProtoPack) bool {
+	var ack JoinRoomResp
+	err := proto.Unmarshal(pProto.body, &ack)
+	if err != nil {
+		logger.Println("Unmarshal proto fail...", ack.GetId())
+		return false
+	}
+	JoinRoomChan <- ack
+	return true
+}
 
 func HandleChangeJoinSettingsResp(pProto *ProtoPack) bool { return true }
 
 func HandleSendInfoResp(pProto *ProtoPack) bool { return true }
 
-func HandleExitRoomResp(pProto *ProtoPack) bool { return true }
+func HandleExitRoomResp(pProto *ProtoPack) bool {
+	var ack ExitRoomResp
+	err := proto.Unmarshal(pProto.body, &ack)
+	if err != nil {
+		logger.Println("Unmarshal proto fail...", ack.GetId())
+		return false
+	}
+	ExitRoomChan <- ack
+	return true
+}

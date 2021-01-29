@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"log"
 	"os"
+	"strconv"
+	"strings"
 )
 
 const (
@@ -16,8 +19,13 @@ const (
 var fileName = "chat-client.log"
 var logFile *os.File
 var logger *log.Logger
-var clientPath = ""
+var curRoomId int32 = 0 // 记录当前路径，如果没有在房间里就为空，不然为房间id
 var clientStatus = UnAuth
+
+type void struct{}
+
+var voidHolder void
+var setAllRoomIds map[int32]void = make(map[int32]void) // 所有房间
 
 func Init() bool {
 	var err error
@@ -86,8 +94,21 @@ func auth() bool {
 func Run() {
 	fmt.Println("Simple Shell")
 	fmt.Println("---------------------")
+	scanner := bufio.NewScanner(os.Stdin)
 	for {
-		fmt.Print(clientPath, " > ")
+		fmt.Print(curRoomId, " > ")
+		scanner.Scan()
+		text := scanner.Text()
+		text = strings.TrimRight(text, "\n")
+		strArrWithEmpty := strings.Split(text, " ")
+		strArr := make([]string, 0)
+		for i := 0; i < len(strArrWithEmpty); i++ {
+			if len(strArrWithEmpty[i]) == 0 {
+				continue
+			}
+			strArr = append(strArr, strArrWithEmpty[i])
+		}
+		print(len(strArr))
 		var cmd, param1, param2, param3, param4 string
 		_, _ = fmt.Scanln(&cmd, &param1, &param2, &param3, &param4)
 		logger.Print("Read cmd from console: ", cmd)
@@ -108,6 +129,9 @@ func dealFromNet() {
 		switch pProto.protoId {
 		case uint32(ProtoId_login_resp_id):
 			HandleLoginResp(pProto)
+			break
+		case uint32(ProtoId_get_all_room_list_resp_id):
+			HandleGetAllRoomListResp(pProto)
 			break
 		case uint32(ProtoId_create_room_resp_id):
 			HandleCreateRoomResp(pProto)
@@ -142,59 +166,140 @@ func dealFromNet() {
 func handleCmd(cmd string, param1 string, param2 string, param3 string, param4 string) {
 	switch cmd {
 	case "cd":
-		cd(param1)
+		if len(param1) == 0 || param1 == ".." {
+			cd(0)
+		} else {
+			nId, err := strconv.Atoi(param1)
+			if err != nil {
+				fmt.Println("请输入房间Id")
+				return
+			}
+			cd(int32(nId))
+		}
 		break
 	case "ls":
 		ls()
+		break
+	case "mkroom":
+		mkroom(param1, param2)
+		break
+	case "rm":
+		nId, err := strconv.Atoi(param1)
+		if err != nil {
+			fmt.Println("请输入房间Id")
+			return
+		}
+		rm(int32(nId))
 		break
 	default:
 		fmt.Printf("未知命令：\"%s\"\n", cmd)
 	}
 }
 
-func cd(path string) {
-	if len(path) == 0 || path == ".." {
-		clientPath = ""
-		fmt.Println("退出房间")
+func cd(targetRoomId int32) {
+	getAllRoomIds()
+	if targetRoomId == 0 {
+		if curRoomId != 0 {
+			var req ExitRoomReq
+			req.RoomId = &curRoomId
+			SendProto(&req, req.GetId())
+			ack, ok := <-ExitRoomChan
+			if !ok {
+				fmt.Println("无法退出房间")
+				return
+			} else if ack.GetError() != ErrorId_err_none {
+				fmt.Println("退出房间失败：", ack.GetError())
+				return
+			} else {
+				fmt.Println("退出房间：", curRoomId)
+				curRoomId = 0
+			}
+		}
 	} else {
-		clientPath = path
-		fmt.Println("进入房间", path)
+		_, exist := setAllRoomIds[targetRoomId]
+		if !exist {
+			fmt.Println("请输入房间Id")
+			return
+		}
+		var req JoinRoomReq
+		req.RoomId = &targetRoomId
+		fmt.Print("请输入您加入的昵称：")
+		var joinName string
+		fmt.Scanln(&joinName)
+		req.Settings.JoinName = &joinName
+		SendProto(&req, req.GetId())
+		ack, ok := <-JoinRoomChan
+		if !ok {
+			fmt.Println("无法加入房间")
+		} else if ack.GetError() != ErrorId_err_none {
+			fmt.Println("加入房间失败：", ack.GetError())
+		} else {
+			fmt.Println("加入房间", targetRoomId)
+			curRoomId = targetRoomId
+		}
 	}
 }
 
 func ls() {
-	fmt.Printf("In ls cmd\n")
-}
-
-func findu(cmdArr []string) {
-	if len(cmdArr) < 2 {
-		fmt.Print(`
-		usage: findu [user_num]
-		`)
+	getAllRoomIds()
+	fmt.Println("Show all room ids:")
+	for k := range setAllRoomIds {
+		fmt.Println(k)
 	}
 }
 
-func findg(cmdArr []string) {
-	if len(cmdArr) < 2 {
-		fmt.Print(`
-		usage: findg [group_num]
-		`)
+func mkroom(name string, open string) {
+	fmt.Println(name)
+	var req CreateRoomReq
+	req.Settings.RoomName = &name
+	if len(name) == 0 {
+		fmt.Print("请输入您想要设置的房间名：")
+		fmt.Scanln(&name)
+	}
+	if len(open) != 0 {
+		open := false
+		req.Settings.Open = &open
+	}
+	SendProto(&req, req.GetId())
+
+	ack, ok := <-CreateRoomChan
+	if !ok {
+		//
+	}
+	if ack.GetError() != ErrorId_err_none {
+		fmt.Println("创建房间失败：", ack.GetError())
+		return
+	}
+	cd(ack.GetNewRoomId())
+}
+
+func rm(roomId int32) {
+	var req DismissRoomReq
+	req.RoomId = &roomId
+	SendProto(&req, req.GetId())
+
+	ack, ok := <-DismissRoomChan
+	if !ok {
+		//
+	}
+	if ack.GetError() != ErrorId_err_none {
+		fmt.Println("解散房间失败：", ack.GetError())
+		return
 	}
 }
 
-func addu(cmdArr []string) {
-	if len(cmdArr) < 2 {
-		fmt.Print(`
-		usage: addu [user_num]
-		`)
-	}
-}
+func getAllRoomIds() {
+	var req GetAllRoomListReq
+	SendProto(&req, req.GetId())
 
-func addg(cmdArr []string) {
-	if len(cmdArr) < 2 {
-		fmt.Print(`
-		usage: addg [group_num]
-		`)
+	ack, ok := <-GetAllRoomListChan
+	if !ok {
+		//
+	}
+	roomIds := ack.GetRoomIds()
+	setAllRoomIds = make(map[int32]void)
+	for i := 0; i < len(roomIds); i++ {
+		setAllRoomIds[roomIds[i]] = voidHolder
 	}
 }
 
