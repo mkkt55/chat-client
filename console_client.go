@@ -14,6 +14,8 @@ const (
 	InRoom   = 4
 )
 
+var isOffline bool = true
+
 var fileName = "chat-client.log"
 var logFile *os.File
 var logger *log.Logger
@@ -24,6 +26,7 @@ type void struct{}
 
 var voidHolder void
 var setAllRoomIds map[int32]void = make(map[int32]void) // 所有房间
+var authStr string
 
 func Init() bool {
 	var err error
@@ -35,7 +38,7 @@ func Init() bool {
 	if logger == nil {
 		log.Fatal("日志记录功能初始化失败")
 	}
-	if !InitConnection() {
+	if !NewConnection() {
 		fmt.Println("连接服务器失败...")
 		return false
 	}
@@ -50,20 +53,6 @@ func Init() bool {
 
 func auth() bool {
 	var pack LoginReq
-	_, err := os.Stat("./auth")
-	var authFile *os.File
-	authStr := ""
-	if err == nil {
-		// authFile, err = os.Open("./auth")
-		// if err == nil {
-		// 	bytes := make([]byte, 100)
-		// 	n, err := authFile.Read(bytes)
-		// 	fmt.Println(bytes[:n])
-		// 	if err == nil {
-		// 		authStr = string(bytes[:n])
-		// 	}
-		// }
-	}
 
 	pack.Auth = &authStr
 	fmt.Println(authStr)
@@ -71,20 +60,13 @@ func auth() bool {
 
 	ack, ok := <-LoginChan
 	if !ok {
-		if authFile != nil {
-			authFile.Close()
-		}
 		return false
 	}
 	logger.Println("err: ", ack.GetError())
 	logger.Println("auth: ", ack.GetAuth())
-	fmt.Println(ack.GetAuth())
+	fmt.Println("你好", ack.GetAuth())
 	if len(ack.GetAuth()) != 0 {
-		authFile, err = os.Create("./auth")
-		authFile.Write([]byte(ack.GetAuth()))
-	}
-	if authFile != nil {
-		authFile.Close()
+		authStr = ack.GetAuth()
 	}
 	return true
 }
@@ -96,6 +78,22 @@ func Run() {
 		fmt.Print(curRoomId, " > ")
 		var cmd, param1, param2, param3, param4 string
 		_, _ = fmt.Scanln(&cmd, &param1, &param2, &param3, &param4)
+		// if isOffline {
+		// 	var str string
+		// 	for str != "y" && str != "n" {
+		// 		fmt.Print("与服务器断开连接，是否重连[y/n]")
+		// 		fmt.Scanln(&str)
+		// 	}
+		// 	if str != "y" {
+		// 		NewConnection()
+		// 		auth()
+		// 		go dealFromNet()
+		// 	} else {
+		// 		fmt.Println("Bye")
+		// 		os.Exit(0)
+		// 	}
+		// 	continue
+		// }
 		logger.Print("Read cmd from console: ", cmd)
 		if len(cmd) == 0 {
 			continue
@@ -108,7 +106,10 @@ func dealFromNet() {
 	for {
 		pProto, err := ReadProto()
 		if err != nil {
-			continue
+			fmt.Printf("读取服务器发生意外：%s", err.Error())
+			fmt.Printf("断开服务器连接，正在重连...")
+			NewConnection()
+			auth()
 		}
 		logger.Println("Receive proto, id: ", pProto.protoId)
 		switch pProto.protoId {

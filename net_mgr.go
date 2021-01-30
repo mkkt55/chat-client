@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os"
+	"strings"
 
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -26,13 +28,41 @@ var conn net.Conn
 var reader *bufio.Reader
 var writer *bufio.Writer
 
-func InitConnection() bool {
-	var err error
-	conn, err = net.Dial("tcp4", "192.168.93.233:15000")
+func NewConnection() bool {
+	_, err := os.Stat("./config")
+	var configFile *os.File
+	var configStr string
+	if err == nil {
+		configFile, err = os.Open("./config")
+		if err == nil {
+			bytes := make([]byte, 1024)
+			n, err := configFile.Read(bytes)
+			if err == nil {
+				configStr = string(bytes[:n])
+			}
+		}
+	}
+	configLine := strings.Split(configStr, "\n")
+	var serverAddress string
+	for i := 0; i < len(configLine); i++ {
+		configLineStrArr := strings.Split(configLine[i], "=")
+		if len(configLineStrArr) < 2 {
+			continue
+		}
+		if strings.Trim(configLineStrArr[0], " ") == "server_address" {
+			serverAddress = strings.Trim(configLineStrArr[1], " ")
+			fmt.Printf("server_address = [%s]\n", serverAddress)
+		}
+	}
+	if configFile != nil {
+		configFile.Close()
+	}
+	conn, err = net.Dial("tcp4", serverAddress)
 	if err != nil {
 		fmt.Printf("Connect error...\n")
 		return false
 	}
+	isOffline = false
 	reader = bufio.NewReader(conn)
 	writer = bufio.NewWriter(conn)
 	return true
