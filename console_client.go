@@ -55,7 +55,6 @@ func auth() bool {
 	var pack LoginReq
 
 	pack.Auth = &authStr
-	fmt.Println(authStr)
 	SendProto(&pack, pack.GetId())
 
 	ack, ok := <-LoginChan
@@ -78,22 +77,6 @@ func Run() {
 		fmt.Print(curRoomId, " > ")
 		var cmd, param1, param2, param3, param4 string
 		_, _ = fmt.Scanln(&cmd, &param1, &param2, &param3, &param4)
-		// if isOffline {
-		// 	var str string
-		// 	for str != "y" && str != "n" {
-		// 		fmt.Print("与服务器断开连接，是否重连[y/n]")
-		// 		fmt.Scanln(&str)
-		// 	}
-		// 	if str != "y" {
-		// 		NewConnection()
-		// 		auth()
-		// 		go dealFromNet()
-		// 	} else {
-		// 		fmt.Println("Bye")
-		// 		os.Exit(0)
-		// 	}
-		// 	continue
-		// }
 		logger.Print("Read cmd from console: ", cmd)
 		if len(cmd) == 0 {
 			continue
@@ -106,10 +89,14 @@ func dealFromNet() {
 	for {
 		pProto, err := ReadProto()
 		if err != nil {
-			fmt.Printf("读取服务器发生意外：%s", err.Error())
-			fmt.Printf("断开服务器连接，正在重连...")
+			ReleaseConnection()
+			fmt.Printf("读取服务器发生意外：%s\n", err.Error())
+			fmt.Printf("断开服务器连接，正在重连...\n")
 			NewConnection()
-			auth()
+			fmt.Printf("重连完成，重新验证身份...\n")
+			auth() // 死锁了，auth函数中会被channel阻塞，想要auth继续运行则依赖这个↖dealFromNet函数的后面的switch逻辑🤣
+			fmt.Printf("身份验证完成...\n")
+			continue
 		}
 		logger.Println("Receive proto, id: ", pProto.protoId)
 		switch pProto.protoId {

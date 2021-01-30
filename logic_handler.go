@@ -21,6 +21,7 @@ func HandleLoginResp(pProto *ProtoPack) bool {
 		logger.Println("Unmarshal proto fail...", ack.GetId())
 		return false
 	}
+	fmt.Println("收到验证身份ACK, auth: ", ack.GetAuth())
 	LoginChan <- ack
 	return true
 }
