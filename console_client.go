@@ -54,15 +54,15 @@ func auth() bool {
 	var authFile *os.File
 	authStr := ""
 	if err == nil {
-		authFile, err = os.Open("./auth")
-		if err == nil {
-			bytes := make([]byte, 100)
-			n, err := authFile.Read(bytes)
-			fmt.Println(bytes[:n])
-			if err == nil {
-				authStr = string(bytes[:n])
-			}
-		}
+		// authFile, err = os.Open("./auth")
+		// if err == nil {
+		// 	bytes := make([]byte, 100)
+		// 	n, err := authFile.Read(bytes)
+		// 	fmt.Println(bytes[:n])
+		// 	if err == nil {
+		// 		authStr = string(bytes[:n])
+		// 	}
+		// }
 	}
 
 	pack.Auth = &authStr
@@ -139,6 +139,9 @@ func dealFromNet() {
 		case uint32(ProtoId_send_info_resp_id):
 			HandleSendInfoResp(pProto)
 			break
+		case uint32(ProtoId_recv_info_ntf_id):
+			HandleRecvInfoNtf(pProto)
+			break
 		case uint32(ProtoId_exit_room_resp_id):
 			HandleExitRoomResp(pProto)
 			break
@@ -175,6 +178,9 @@ func handleCmd(cmd string, param1 string, param2 string, param3 string, param4 s
 			return
 		}
 		rm(int32(nId))
+		break
+	case "send":
+		send(param1)
 		break
 	default:
 		fmt.Printf("未知命令：\"%s\"\n", cmd)
@@ -273,6 +279,21 @@ func rm(roomId int32) {
 	}
 	if ack.GetError() != ErrorId_err_none {
 		fmt.Println("解散房间失败：", ack.GetError())
+		return
+	}
+}
+
+func send(msg string) {
+	var req SendInfoReq
+	req.Info = &msg
+	SendProto(&req, req.GetId())
+
+	ack, ok := <-SendInfoChan
+	if !ok {
+		//
+	}
+	if ack.GetError() != ErrorId_err_none {
+		fmt.Println("发送失败：", ack.GetError())
 		return
 	}
 }

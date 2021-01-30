@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+
 	"google.golang.org/protobuf/proto"
 )
 
@@ -9,6 +11,7 @@ var GetAllRoomListChan = make(chan GetAllRoomListResp, 1)
 var CreateRoomChan = make(chan CreateRoomResp, 1)
 var DismissRoomChan = make(chan DismissRoomResp, 1)
 var JoinRoomChan = make(chan JoinRoomResp, 1)
+var SendInfoChan = make(chan SendInfoResp, 1)
 var ExitRoomChan = make(chan ExitRoomResp, 1)
 
 func HandleLoginResp(pProto *ProtoPack) bool {
@@ -72,7 +75,27 @@ func HandleJoinRoomResp(pProto *ProtoPack) bool {
 
 func HandleChangeJoinSettingsResp(pProto *ProtoPack) bool { return true }
 
-func HandleSendInfoResp(pProto *ProtoPack) bool { return true }
+func HandleSendInfoResp(pProto *ProtoPack) bool {
+	var ack SendInfoResp
+	err := proto.Unmarshal(pProto.body, &ack)
+	if err != nil {
+		logger.Println("Unmarshal proto fail...", ack.GetId())
+		return false
+	}
+	SendInfoChan <- ack
+	return true
+}
+
+func HandleRecvInfoNtf(pProto *ProtoPack) bool {
+	var ntf RecvInfoNtf
+	err := proto.Unmarshal(pProto.body, &ntf)
+	if err != nil {
+		logger.Println("Unmarshal proto fail...", ntf.GetId())
+		return false
+	}
+	fmt.Printf("[来自%s的消息] %s\n", ntf.GetSenderName(), ntf.GetMsg())
+	return true
+}
 
 func HandleExitRoomResp(pProto *ProtoPack) bool {
 	var ack ExitRoomResp
