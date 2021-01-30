@@ -25,7 +25,7 @@ var clientStatus = UnAuth
 type void struct{}
 
 var voidHolder void
-var setAllRoomIds map[int32]void = make(map[int32]void) // 所有房间
+var setAllRoomIds map[int32]RoomSettings = make(map[int32]RoomSettings) // 所有房间
 var authStr string
 
 func Init() bool {
@@ -77,6 +77,20 @@ func Run() {
 		fmt.Print(curRoomId, " > ")
 		var cmd, param1, param2, param3, param4 string
 		_, _ = fmt.Scanln(&cmd, &param1, &param2, &param3, &param4)
+		if isOffline {
+			for cmd != "y" && cmd != "n" {
+				fmt.Print("请输入y或n[y/n]")
+				_, _ = fmt.Scanln(&cmd, &param1, &param2, &param3, &param4)
+			}
+			if cmd == "y" {
+				NewConnection()
+				go dealFromNet()
+				auth()
+			} else {
+				os.Exit(0)
+			}
+			continue
+		}
 		logger.Print("Read cmd from console: ", cmd)
 		if len(cmd) == 0 {
 			continue
@@ -90,13 +104,15 @@ func dealFromNet() {
 		pProto, err := ReadProto()
 		if err != nil {
 			ReleaseConnection()
-			fmt.Printf("读取服务器发生意外：%s\n", err.Error())
-			fmt.Printf("断开服务器连接，正在重连...\n")
-			NewConnection()
-			fmt.Printf("重连完成，重新验证身份...\n")
-			auth() // 死锁了，auth函数中会被channel阻塞，想要auth继续运行则依赖这个↖dealFromNet函数的后面的switch逻辑🤣
-			fmt.Printf("身份验证完成...\n")
-			continue
+			fmt.Printf("\r读取服务器发生意外：%s\n", err.Error())
+			fmt.Printf("\r断开服务器连接，是否重连[y/n]")
+			// NewConnection()
+			// fmt.Printf("重连完成，重新验证身份...\n")
+			// auth() // 死锁了，auth函数中会被channel阻塞，想要auth继续运行则依赖这个↖dealFromNet函数的后面的switch逻辑🤣
+			// fmt.Printf("身份验证完成...\n")
+			// continue
+			isOffline = true
+			return
 		}
 		logger.Println("Receive proto, id: ", pProto.protoId)
 		switch pProto.protoId {
@@ -295,9 +311,9 @@ func getAllRoomIds() {
 		//
 	}
 	roomIds := ack.GetRoomIds()
-	setAllRoomIds = make(map[int32]void)
+	setAllRoomIds = make(map[int32]RoomSettings)
 	for i := 0; i < len(roomIds); i++ {
-		setAllRoomIds[roomIds[i]] = voidHolder
+		setAllRoomIds[roomIds[i]] = RoomSettings{}
 	}
 }
 
