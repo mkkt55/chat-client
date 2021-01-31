@@ -288,6 +288,9 @@ func rm(roomId int32) {
 }
 
 func send(msg string) {
+	if curRoomId == 0 {
+		return
+	}
 	var req SendInfoReq
 	req.Info = &msg
 	SendProto(&req, req.GetId())

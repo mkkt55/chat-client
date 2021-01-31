@@ -94,7 +94,8 @@ func HandleRecvInfoNtf(pProto *ProtoPack) bool {
 		logger.Println("Unmarshal proto fail...", ntf.GetId())
 		return false
 	}
-	fmt.Printf("[来自%s的消息] %s\n", ntf.GetSenderName(), ntf.GetMsg())
+	fmt.Printf("\r来自[%s]的消息：%s\n", ntf.GetSenderName(), ntf.GetMsg())
+	fmt.Print(curRoomId, " > ")
 	return true
 }
 
