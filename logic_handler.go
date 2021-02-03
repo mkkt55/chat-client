@@ -95,7 +95,7 @@ func HandleRecvInfoNtf(pProto *ProtoPack) bool {
 		return false
 	}
 	fmt.Printf("\r来自[%s]的消息：%s\n", ntf.GetSenderName(), ntf.GetMsg())
-	fmt.Print(curRoomId, " > ")
+	fmt.Print("房间", curRoomId, "> ")
 	return true
 }
 

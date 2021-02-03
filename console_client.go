@@ -25,7 +25,7 @@ var clientStatus = UnAuth
 type void struct{}
 
 var voidHolder void
-var setAllRoomIds map[int32]RoomSettings = make(map[int32]RoomSettings) // 所有房间
+var mapId2Rooms map[int32]*RoomSettings = make(map[int32]*RoomSettings) // 所有房间
 var authStr string
 
 func Init() bool {
@@ -74,7 +74,11 @@ func Run() {
 	fmt.Println("Simple Shell")
 	fmt.Println("---------------------")
 	for {
-		fmt.Print(curRoomId, " > ")
+		if curRoomId == 0 {
+			fmt.Print("大厅> ")
+		} else {
+			fmt.Print("房间", curRoomId, "> ")
+		}
 		var cmd, param1, param2, param3, param4 string
 		_, _ = fmt.Scanln(&cmd, &param1, &param2, &param3, &param4)
 		if isOffline {
@@ -163,7 +167,7 @@ func handleCmd(cmd string, param1 string, param2 string, param3 string, param4 s
 		} else {
 			nId, err := strconv.Atoi(param1)
 			if err != nil {
-				fmt.Println("请输入房间Id")
+				fmt.Println("请输入有效的房间Id")
 				return
 			}
 			cd(int32(nId))
@@ -178,7 +182,7 @@ func handleCmd(cmd string, param1 string, param2 string, param3 string, param4 s
 	case "rm":
 		nId, err := strconv.Atoi(param1)
 		if err != nil {
-			fmt.Println("请输入房间Id")
+			fmt.Println("请输入有效的房间Id")
 			return
 		}
 		rm(int32(nId))
@@ -211,9 +215,9 @@ func cd(targetRoomId int32) {
 			}
 		}
 	} else {
-		_, exist := setAllRoomIds[targetRoomId]
+		_, exist := mapId2Rooms[targetRoomId]
 		if !exist {
-			fmt.Println("请输入房间Id")
+			fmt.Println("请输入有效的房间Id")
 			return
 		}
 		var req JoinRoomReq
@@ -240,13 +244,17 @@ func cd(targetRoomId int32) {
 func ls() {
 	getAllRoomIds()
 	fmt.Println("Show all room ids:")
-	for k := range setAllRoomIds {
-		fmt.Println(k)
+	for id := range mapId2Rooms {
+		room := mapId2Rooms[id]
+		if room.GetOpen() {
+			fmt.Println(id, room.GetRoomName(), "open")
+		} else {
+			fmt.Println(id, room.GetRoomName(), "close")
+		}
 	}
 }
 
 func mkroom(name string, open string) {
-	fmt.Println(name)
 	var req CreateRoomReq
 	var rs RoomSettings
 	rs.RoomName = &name
@@ -302,6 +310,8 @@ func send(msg string) {
 	if ack.GetError() != ErrorId_err_none {
 		fmt.Println("发送失败：", ack.GetError())
 		return
+	} else {
+		fmt.Printf("\r您成功发送消息：%s\n", msg)
 	}
 }
 
@@ -313,10 +323,10 @@ func getAllRoomIds() {
 	if !ok {
 		//
 	}
-	roomIds := ack.GetRoomIds()
-	setAllRoomIds = make(map[int32]RoomSettings)
-	for i := 0; i < len(roomIds); i++ {
-		setAllRoomIds[roomIds[i]] = RoomSettings{}
+	rooms := ack.GetRooms()
+	mapId2Rooms = make(map[int32]*RoomSettings)
+	for i := 0; i < len(rooms); i++ {
+		mapId2Rooms[rooms[i].GetRoomId()] = rooms[i]
 	}
 }
 
