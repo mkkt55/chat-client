@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/signal"
 	"strconv"
+	"syscall"
 )
 
 const (
@@ -29,6 +31,15 @@ var mapId2Rooms map[int32]*RoomSettings = make(map[int32]*RoomSettings) // 所�
 var authStr string
 
 func Init() bool {
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		<-sigs
+		fmt.Println("\r欢迎下次使用")
+		ReleaseConnection()
+		os.Exit(0)
+	}()
+
 	var err error
 	logFile, err = os.Create(fileName)
 	if err != nil {
@@ -71,8 +82,8 @@ func auth() bool {
 }
 
 func Run() {
-	fmt.Println("Simple Shell")
-	fmt.Println("---------------------")
+	fmt.Println("欢迎使用聊天室应用")
+	printHelp()
 	for {
 		if curRoomId == 0 {
 			fmt.Print("大厅> ")
@@ -101,6 +112,19 @@ func Run() {
 		}
 		handleCmd(cmd, param1, param2, param3, param4)
 	}
+}
+
+func printHelp() {
+	fmt.Println("-------------------命令提示-------------------")
+	fmt.Println(" 打印帮助: [help]")
+	fmt.Println(" 所有房间: [ls]")
+	fmt.Println(" 进入房间: [cd 房间Id]")
+	fmt.Println(" 退出房间: [cd]/[cd ..]")
+	fmt.Println(" 发送消息: [send 内容]")
+	fmt.Println(" 开房间门: [set open]       需要您是房间的创建者")
+	fmt.Println(" 关房间门: [set close]      需要您是房间的创建者")
+	fmt.Println(" 查看群员: [ls]             需要您在房间内")
+	fmt.Println("----------------------------------------------")
 }
 
 func dealFromNet() {
@@ -175,6 +199,9 @@ func handleCmd(cmd string, param1 string, param2 string, param3 string, param4 s
 			}
 			cd(int32(nId))
 		}
+		break
+	case "help":
+		printHelp()
 		break
 	case "ls":
 		ls()
@@ -278,7 +305,7 @@ func ls() {
 		if !ok {
 			return
 		}
-		fmt.Println("当前房间所有成员（姓名、成员id）")
+		fmt.Println("当前房间所有成员（姓名、成员Id）")
 		for _, name := range ack.GetJoinNames() {
 			fmt.Println(name)
 		}
