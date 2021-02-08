@@ -126,6 +126,9 @@ func dealFromNet() {
 		case uint32(ProtoId_get_all_room_list_resp_id):
 			HandleGetAllRoomListResp(pProto)
 			break
+		case uint32(ProtoId_get_room_all_member_resp_id):
+			HandleGetRoomAllMembersResp(pProto)
+			break
 		case uint32(ProtoId_create_room_resp_id):
 			HandleCreateRoomResp(pProto)
 			break
@@ -190,6 +193,9 @@ func handleCmd(cmd string, param1 string, param2 string, param3 string, param4 s
 	case "send":
 		send(param1)
 		break
+	case "set":
+		set(param1)
+		break
 	default:
 		fmt.Printf("未知命令：\"%s\"\n", cmd)
 	}
@@ -232,25 +238,51 @@ func cd(targetRoomId int32) {
 		ack, ok := <-JoinRoomChan
 		if !ok {
 			fmt.Println("无法加入房间")
-		} else if ack.GetError() != ErrorId_err_none {
-			fmt.Println("加入房间失败：", ack.GetError())
-		} else {
-			fmt.Println("加入房间", targetRoomId)
+			return
+		}
+		switch ack.GetError() {
+		case ErrorId_err_none:
+			fmt.Println("成功加入房间", targetRoomId)
 			curRoomId = targetRoomId
+			break
+		case ErrorId_err_room_id_not_exist:
+			fmt.Println("加入房间失败，该房间不存在")
+			break
+		case ErrorId_err_join_room_close:
+			fmt.Println("您不能加入一个不可加入的房间")
+			break
+		default:
+			fmt.Println("加入房间失败：", ack.GetError())
+			break
 		}
 	}
 }
 
 func ls() {
 	getAllRoomIds()
-	fmt.Println("Show all room ids:")
+	fmt.Println("展示所有房间（房间id、房间名、房间是否允许加入）:")
 	for id := range mapId2Rooms {
 		room := mapId2Rooms[id]
 		if room.GetOpen() {
-			fmt.Println(id, room.GetRoomName(), "open")
+			fmt.Println(id, room.GetRoomName(), "可加入")
 		} else {
-			fmt.Println(id, room.GetRoomName(), "close")
+			fmt.Println(id, room.GetRoomName(), "不可加入")
 		}
+	}
+	fmt.Println("---------------------------------")
+	if curRoomId != 0 {
+		var req GetRoomAllMemberReq
+		req.RoomId = &curRoomId
+		SendProto(&req, req.GetId())
+		ack, ok := <-GetRoomAllMemberChan
+		if !ok {
+			return
+		}
+		fmt.Println("当前房间所有成员（姓名、成员id）")
+		for _, name := range ack.GetJoinNames() {
+			fmt.Println(name)
+		}
+		fmt.Println("-----------------------------")
 	}
 }
 
@@ -315,6 +347,47 @@ func send(msg string) {
 	}
 }
 
+func set(status string) {
+	if curRoomId == 0 {
+		fmt.Println("您当前不在任一个房间里")
+		return
+	}
+	open := true
+	switch status {
+	case "open":
+		open = true
+		break
+	case "close":
+		open = false
+		break
+	default:
+		fmt.Println("请输入\"open\"或\"close\"")
+		return
+	}
+	var req ChangeRoomSettingsReq
+	req.RoomId = &curRoomId
+	var settings RoomSettings
+	settings.Open = &open
+	req.Settings = &settings
+	SendProto(&req, req.GetId())
+
+	ack, ok := <-ChangeRoomSettingsChan
+	if !ok {
+		fmt.Println("设置失败，客户端错误")
+		return
+	}
+	switch ack.GetError() {
+	case ErrorId_err_none:
+		fmt.Println("设置成功")
+		break
+	case ErrorId_err_opt_disallowed_not_room_holder:
+		fmt.Println("您不是房主，无法设置")
+		break
+	default:
+		fmt.Println("出现错误：", ack.GetError())
+	}
+}
+
 func getAllRoomIds() {
 	var req GetAllRoomListReq
 	SendProto(&req, req.GetId())
@@ -328,8 +401,4 @@ func getAllRoomIds() {
 	for i := 0; i < len(rooms); i++ {
 		mapId2Rooms[rooms[i].GetRoomId()] = rooms[i]
 	}
-}
-
-func tryEnterChattingGroup(cmdArr []string) {
-	//
 }

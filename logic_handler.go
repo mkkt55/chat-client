@@ -10,7 +10,9 @@ var LoginChan = make(chan LoginResp, 1)
 var GetAllRoomListChan = make(chan GetAllRoomListResp, 1)
 var CreateRoomChan = make(chan CreateRoomResp, 1)
 var DismissRoomChan = make(chan DismissRoomResp, 1)
+var ChangeRoomSettingsChan = make(chan ChangeRoomSettingsResp, 1)
 var JoinRoomChan = make(chan JoinRoomResp, 1)
+var GetRoomAllMemberChan = make(chan GetRoomAllMemberResp, 1)
 var SendInfoChan = make(chan SendInfoResp, 1)
 var ExitRoomChan = make(chan ExitRoomResp, 1)
 
@@ -37,6 +39,17 @@ func HandleGetAllRoomListResp(pProto *ProtoPack) bool {
 	return true
 }
 
+func HandleGetRoomAllMembersResp(pProto *ProtoPack) bool {
+	var ack GetRoomAllMemberResp
+	err := proto.Unmarshal(pProto.body, &ack)
+	if err != nil {
+		logger.Println("Unmarshal proto fail...", ack.GetId())
+		return false
+	}
+	GetRoomAllMemberChan <- ack
+	return true
+}
+
 func HandleCreateRoomResp(pProto *ProtoPack) bool {
 	var ack CreateRoomResp
 	err := proto.Unmarshal(pProto.body, &ack)
@@ -59,7 +72,16 @@ func HandleDismissRoomResp(pProto *ProtoPack) bool {
 	return true
 }
 
-func HandleChangeRoomSettingsResp(pProto *ProtoPack) bool { return true }
+func HandleChangeRoomSettingsResp(pProto *ProtoPack) bool {
+	var ack ChangeRoomSettingsResp
+	err := proto.Unmarshal(pProto.body, &ack)
+	if err != nil {
+		logger.Println("Unmarshal proto fail...", ack.GetId())
+		return false
+	}
+	ChangeRoomSettingsChan <- ack
+	return true
+}
 
 func HandleChangeRoomSettingsNtf(pProto *ProtoPack) bool { return true }
 
