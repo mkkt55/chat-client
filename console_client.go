@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"log"
 	"os"
@@ -9,24 +10,13 @@ import (
 	"syscall"
 )
 
-const (
-	UnAuth   = 1
-	WaitAuth = 2
-	OutRoom  = 3
-	InRoom   = 4
-)
-
 var isOffline bool = true
 
-var fileName = "chat-client.log"
+var logFileName = "chat-client.log"
 var logFile *os.File
 var logger *log.Logger
 var curRoomId int32 = 0 // 记录当前路径，如果没有在房间里就为空，不然为房间id
-var clientStatus = UnAuth
 
-type void struct{}
-
-var voidHolder void
 var mapId2Rooms map[int32]*RoomSettings = make(map[int32]*RoomSettings) // 所有房间
 var authStr string
 
@@ -41,7 +31,7 @@ func Init() bool {
 	}()
 
 	var err error
-	logFile, err = os.Create(fileName)
+	logFile, err = os.Create(logFileName)
 	if err != nil {
 		log.Fatal("获取日志文件失败")
 	}
@@ -77,6 +67,8 @@ func auth() bool {
 	fmt.Println("你好", ack.GetAuth())
 	if len(ack.GetAuth()) != 0 {
 		authStr = ack.GetAuth()
+	} else {
+		curRoomId = 0
 	}
 	return true
 }
@@ -115,16 +107,19 @@ func Run() {
 }
 
 func printHelp() {
-	fmt.Println("-------------------命令提示-------------------")
+	fmt.Println("----------------------命令提示-----------------------")
 	fmt.Println(" 打印帮助: [help]")
 	fmt.Println(" 所有房间: [ls]")
+	fmt.Println(" 创建房间: [mkroom 房间名]         默认门开")
+	fmt.Println(" 创建房间: [mkroom 房间名 close]   默认门关")
 	fmt.Println(" 进入房间: [cd 房间Id]")
+	fmt.Println(" 更改昵称: [cd 当前房间]")
 	fmt.Println(" 退出房间: [cd]/[cd ..]")
-	fmt.Println(" 发送消息: [send 内容]")
-	fmt.Println(" 开房间门: [set open]       需要您是房间的创建者")
-	fmt.Println(" 关房间门: [set close]      需要您是房间的创建者")
-	fmt.Println(" 查看群员: [ls]             需要您在房间内")
-	fmt.Println("----------------------------------------------")
+	fmt.Println(" 发送消息: [send]                 在下一行输入您的消息")
+	fmt.Println(" 开房间门: [set open]             需要您是房间的创建者")
+	fmt.Println(" 关房间门: [set close]            需要您是房间的创建者")
+	fmt.Println(" 查看群员: [ls]                   需要您在房间内")
+	fmt.Println("----------------------------------------------------")
 }
 
 func dealFromNet() {
@@ -194,7 +189,7 @@ func handleCmd(cmd string, param1 string, param2 string, param3 string, param4 s
 		} else {
 			nId, err := strconv.Atoi(param1)
 			if err != nil {
-				fmt.Println("请输入有效的房间Id")
+				fmt.Println("命令格式: cd [房间Id]")
 				return
 			}
 			cd(int32(nId))
@@ -207,24 +202,32 @@ func handleCmd(cmd string, param1 string, param2 string, param3 string, param4 s
 		ls()
 		break
 	case "mkroom":
-		mkroom(param1, param2)
-		break
-	case "rm":
-		nId, err := strconv.Atoi(param1)
-		if err != nil {
-			fmt.Println("请输入有效的房间Id")
+		if len(param1) == 0 {
+			fmt.Println("命令格式: mkroom 房间名")
 			return
 		}
-		rm(int32(nId))
+		if param2 == "close" {
+			mkroom(param1, false)
+		} else {
+			mkroom(param1, true)
+		}
 		break
 	case "send":
-		send(param1)
+		send()
 		break
 	case "set":
-		set(param1)
+		if param1 == "open" {
+			set(true)
+		} else if param1 == "close" {
+			set(false)
+		} else {
+			fmt.Println("命令格式: set [close|open]")
+			return
+		}
 		break
 	default:
 		fmt.Printf("未知命令：\"%s\"\n", cmd)
+		break
 	}
 }
 
@@ -313,19 +316,12 @@ func ls() {
 	}
 }
 
-func mkroom(name string, open string) {
+func mkroom(name string, open bool) {
 	var req CreateRoomReq
 	var rs RoomSettings
 	rs.RoomName = &name
+	rs.Open = &open
 	req.Settings = &rs
-	if len(name) == 0 {
-		fmt.Print("请输入您想要设置的房间名：")
-		fmt.Scanln(&name)
-	}
-	if len(open) != 0 {
-		open := false
-		req.Settings.Open = &open
-	}
 	SendProto(&req, req.GetId())
 
 	ack, ok := <-CreateRoomChan
@@ -339,25 +335,14 @@ func mkroom(name string, open string) {
 	cd(ack.GetNewRoomId())
 }
 
-func rm(roomId int32) {
-	var req DismissRoomReq
-	req.RoomId = &roomId
-	SendProto(&req, req.GetId())
-
-	ack, ok := <-DismissRoomChan
-	if !ok {
-		//
-	}
-	if ack.GetError() != ErrorId_err_none {
-		fmt.Println("解散房间失败：", ack.GetError())
-		return
-	}
-}
-
-func send(msg string) {
+func send() {
 	if curRoomId == 0 {
+		fmt.Println("您当前不在任一个房间里")
 		return
 	}
+	fmt.Print("请输入您的消息: ")
+	reader := bufio.NewReader(os.Stdin)
+	msg, _ := reader.ReadString('\n')
 	var req SendInfoReq
 	req.Info = &msg
 	SendProto(&req, req.GetId())
@@ -374,21 +359,9 @@ func send(msg string) {
 	}
 }
 
-func set(status string) {
+func set(open bool) {
 	if curRoomId == 0 {
 		fmt.Println("您当前不在任一个房间里")
-		return
-	}
-	open := true
-	switch status {
-	case "open":
-		open = true
-		break
-	case "close":
-		open = false
-		break
-	default:
-		fmt.Println("请输入\"open\"或\"close\"")
 		return
 	}
 	var req ChangeRoomSettingsReq
