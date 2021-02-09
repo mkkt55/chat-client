@@ -67,8 +67,12 @@ func auth() bool {
 	fmt.Println("你好", ack.GetAuth())
 	if len(ack.GetAuth()) != 0 {
 		authStr = ack.GetAuth()
-	} else {
-		curRoomId = 0
+	}
+	if ack.GetCurRoomId() == 0 {
+		if curRoomId != 0 {
+			fmt.Println("您太久未重新连接，需要重新进入房间")
+			curRoomId = 0
+		}
 	}
 	return true
 }
